@@ -90,7 +90,7 @@ cd prefect-poc
 pip install -e ".[dev]"
 ```
 
-### Run the Flow
+### Run the Flow (NO SERVER NEEDED!)
 
 ```bash
 python prefect_poc/flows.py
@@ -107,17 +107,128 @@ Data saved to output/prefect_users.csv
 Flow completed successfully!
 ```
 
-### Using Prefect UI (Optional)
+**That's it! No server required for basic usage!** ✅
 
+### Using Prefect UI (Optional - Requires Server)
+
+If you want the web UI, you have two options:
+
+**Option 1: Local Server (Free)**
 ```bash
-# Start Prefect server
+# Terminal 1: Start Prefect server
 prefect server start
 
-# In another terminal, run flow with UI tracking
+# Terminal 2: Run flow with UI tracking
 python prefect_poc/flows.py
 ```
 
 Access UI at **http://localhost:4200**
+
+**Option 2: Prefect Cloud (Free tier available)**
+```bash
+# Sign up at https://app.prefect.cloud
+prefect cloud login
+python prefect_poc/flows.py
+```
+
+Access UI at **https://app.prefect.cloud**
+
+**Key Difference:**
+- **Dagster:** Server REQUIRED (for UI and execution)
+- **Prefect:** Server OPTIONAL (can run directly without it)
+
+### Scheduling Prefect Flows
+
+Prefect uses **Deployments** for scheduling. You need a server running.
+
+**Step 1: Create a Deployment**
+
+```python
+# prefect_poc/flows.py - Add at the end
+if __name__ == "__main__":
+    from prefect.deployments import Deployment
+    from prefect.server.schemas.schedules import CronSchedule
+    
+    # Create deployment with schedule
+    deployment = Deployment.build_from_flow(
+        flow=data_extraction_flow,
+        name="daily-data-extraction",
+        schedule=CronSchedule(cron="0 2 * * *"),  # Daily at 2 AM
+        work_queue_name="default"
+    )
+    
+    deployment.apply()
+    print("Deployment created!")
+```
+
+**Step 2: Start Prefect Server**
+
+```bash
+# Terminal 1: Start server
+prefect server start
+```
+
+**Step 3: Create & Apply Deployment**
+
+```bash
+# Terminal 2: Create deployment
+cd prefect-poc
+python prefect_poc/flows.py
+```
+
+**Step 4: Start Worker**
+
+```bash
+# Terminal 3: Start worker to execute scheduled runs
+prefect worker start --pool default
+```
+
+**Alternative: Quick Deployment via CLI**
+
+```bash
+# Simpler method
+prefect deployment build prefect_poc/flows.py:data_extraction_flow \
+    --name "daily-extraction" \
+    --cron "0 2 * * *" \
+    --apply
+
+# Start worker
+prefect worker start --pool default
+```
+
+**Common Schedules:**
+```python
+# Every hour
+CronSchedule(cron="0 * * * *")
+
+# Every 6 hours
+CronSchedule(cron="0 */6 * * *")
+
+# Business hours (9 AM - 5 PM, Mon-Fri)
+CronSchedule(cron="0 9-17 * * 1-5")
+
+# Every day at 2 AM
+CronSchedule(cron="0 2 * * *")
+```
+
+**Using Prefect Cloud (Easier):**
+
+```bash
+# 1. Sign up at https://app.prefect.cloud
+# 2. Login
+prefect cloud login
+
+# 3. Create deployment (cloud handles workers!)
+prefect deployment build prefect_poc/flows.py:data_extraction_flow \
+    --name "production-pipeline" \
+    --cron "0 2 * * *" \
+    --apply
+```
+
+**Key Differences from Dagster:**
+- **Dagster:** Schedules built into platform (easier)
+- **Prefect:** Need deployments + workers (more flexible)
+- **Prefect Cloud:** Managed workers (easiest)
 
 ---
 
